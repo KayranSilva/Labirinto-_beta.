@@ -1,4 +1,3 @@
-// config.c
 #include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,7 +25,7 @@ static char* trim(char *s) {
 
 static void default_config(Configuracoes *cfg) {
     cfg->TAM_POPULACAO   = 300;
-    cfg->MAX_MOVIMENTOS  = 60;
+    cfg->MAX_MOVIMENTOS  = 200;
     cfg->TAXA_MUTACAO    = 0.20f;
     cfg->TAXA_CRUZAMENTO = 0.95f;
     cfg->TAXA_ELITISMO   = 0.50f;
@@ -68,9 +67,7 @@ int carregar_configuracao(const char *arquivo, Configuracoes *cfg) {
         char *key = trim(p);
         char *value = trim(eq + 1);
 
-        if (strcmp(key, "TAM_POPULACAO") == 0) {
-            cfg->TAM_POPULACAO = atoi(value);
-        }
+        if (strcmp(key, "TAM_POPULACAO") == 0) cfg->TAM_POPULACAO = atoi(value);
         else if (strcmp(key, "MAX_MOVIMENTOS") == 0) cfg->MAX_MOVIMENTOS = atoi(value);
         else if (strcmp(key, "TAXA_MUTACAO") == 0) cfg->TAXA_MUTACAO = atof(value);
         else if (strcmp(key, "TAXA_CRUZAMENTO") == 0) cfg->TAXA_CRUZAMENTO = atof(value);
@@ -87,8 +84,11 @@ int carregar_configuracao(const char *arquivo, Configuracoes *cfg) {
         else if (strcmp(key, "PESO_BAIXO") == 0) cfg->PESO_BAIXO = atoi(value);
         else if (strcmp(key, "PESO_ESQUERDA") == 0) cfg->PESO_ESQUERDA = atoi(value);
         else if (strcmp(key, "PESO_DIREITA") == 0) cfg->PESO_DIREITA = atoi(value);
+        else if (strcmp(key, "ARQUIVO_LOG") == 0)
+            strncpy(cfg->ARQUIVO_LOG, value, sizeof(cfg->ARQUIVO_LOG) - 1);
     }
 
     fclose(f);
+    
     return 1;
 }

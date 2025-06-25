@@ -1,4 +1,3 @@
-// config.h
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -20,9 +19,9 @@ typedef struct {
     int   PESO_BAIXO;
     int   PESO_ESQUERDA;
     int   PESO_DIREITA;
+    char ARQUIVO_LOG[256];
 } Configuracoes;
 
-// Carrega as configuracoes do arquivo .ini
 int carregar_configuracao(const char *arquivo, Configuracoes *cfg);
 
-#endif // CONFIG_H
+#endif

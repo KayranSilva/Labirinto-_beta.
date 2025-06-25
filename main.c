@@ -10,14 +10,13 @@
 #include "genetic.h"
 
 int main(int argc, char *argv[]) {
-    // Semente para o gerador de números aleatórios
     srand((unsigned) time(NULL));
 
-    // Arquivo de configuração padrão
-    char arquivo_config[256] = "config.ini";
+    // Caminho padrão para o arquivo de configuração na pasta "configuracoes"
+    char arquivo_config[256] = "configuracoes/config.ini";
     if (argc >= 2) {
-        strncpy(arquivo_config, argv[1], sizeof(arquivo_config) - 1);
-        arquivo_config[sizeof(arquivo_config) - 1] = '\0';
+        // Se o usuário passar um nome, busca na pasta "configuracoes"
+        snprintf(arquivo_config, sizeof(arquivo_config), "configuracoes/%s", argv[1]);
     }
 
     // Carrega as configurações do arquivo .ini
@@ -41,8 +40,12 @@ int main(int argc, char *argv[]) {
     encontrar_posicoes(&config);
     imprimir_labirinto(&config);
 
+    // Monta o caminho completo para o log na pasta logs/
+    char caminho_log[300];
+    snprintf(caminho_log, sizeof(caminho_log), "logs/%s", config.ARQUIVO_LOG);
+
     // Abre (ou recria) o arquivo CSV de log, sobrescrevendo o conteúdo anterior
-    FILE *logFile = fopen("log.csv", "w");
+    FILE *logFile = fopen(caminho_log, "w");
     if (!logFile) {
         printf("Erro ao abrir arquivo de log.\n");
         liberar_labirinto(&config);
