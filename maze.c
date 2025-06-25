@@ -3,59 +3,71 @@
 #include <stdlib.h>
 #include <string.h>
 
-char** labirinto;
+char **labirinto = NULL;
 int inicio_x, inicio_y;
 int saida_x, saida_y;
 
 void carregar_labirinto(Configuracoes *config) {
-    FILE* file = fopen(config->ARQUIVO_LABIRINTO, "r");
-    if (!file) {
-        perror("Erro ao abrir arquivo do labirinto");
+    printf("Carregando labirinto: %s\n", config->ARQUIVO_LABIRINTO);
+    FILE *f = fopen(config->ARQUIVO_LABIRINTO, "r");
+    if (!f) {
+        printf("Erro: Nao foi possivel abrir '%s'\n", config->ARQUIVO_LABIRINTO);
         exit(1);
     }
 
-    int linhas = 0;
-    int colunas = 0;
-    char linha[256];
+    int linhas = 0, colunas = 0;
+    char buffer[512];
 
-   
-    while (fgets(linha, sizeof(linha), file)) {
-        linha[strcspn(linha, "\r\n")] = '\0';
-        if (strlen(linha) > 0) {
-            linhas++;
-            if (colunas == 0) {
-                colunas = strlen(linha);
-            }
+    while (fgets(buffer, sizeof(buffer), f)) {
+        buffer[strcspn(buffer, "\r\n")] = '\0';
+        if (strlen(buffer) == 0) continue;
+        if (colunas == 0) colunas = (int)strlen(buffer);
+        else if ((int)strlen(buffer) != colunas) {
+            printf("Erro: Labirinto deve ter linhas de mesmo tamanho\n");
+            fclose(f);
+            exit(1);
         }
+        linhas++;
+    }
+
+    if (linhas == 0 || colunas == 0) {
+        printf("Erro: Labirinto vazio ou invalido\n");
+        fclose(f);
+        exit(1);
     }
 
     config->LINHAS = linhas;
     config->COLUNAS = colunas;
 
-    rewind(file);
+    labirinto = malloc(linhas * sizeof(char *));
+    if (!labirinto) {
+        printf("Erro: Falha ao alocar memoria para labirinto\n");
+        fclose(f);
+        exit(1);
+    }
 
-    
-    labirinto = (char**)malloc(linhas * sizeof(char*));
+    rewind(f);
     for (int i = 0; i < linhas; i++) {
-        labirinto[i] = (char*)malloc((colunas + 1) * sizeof(char));
-    }
+        if (!fgets(buffer, sizeof(buffer), f)) break;
+        buffer[strcspn(buffer, "\r\n")] = '\0';
+        if (strlen(buffer) != colunas) continue;
 
-  
-    int i = 0;
-    while (fgets(linha, sizeof(linha), file) && i < linhas) {
-        linha[strcspn(linha, "\r\n")] = '\0';
-        if (strlen(linha) > 0) {
-            strncpy(labirinto[i], linha, colunas);
-            labirinto[i][colunas] = '\0';
-            i++;
+        labirinto[i] = malloc(colunas + 1);
+        if (!labirinto[i]) {
+            printf("Erro: Falha ao alocar linha %d\n", i);
+            for (int j = 0; j < i; j++) free(labirinto[j]);
+            free(labirinto);
+            fclose(f);
+            exit(1);
         }
+        strcpy(labirinto[i], buffer);
     }
+    fclose(f);
 
-    fclose(file);
 }
 
 void imprimir_labirinto(Configuracoes *config) {
-    printf("\nLabirinto Atual (%dx%d):\n", config->LINHAS, config->COLUNAS);
+    printf("\nLabirinto (%dx%d):\n", config->LINHAS, config->COLUNAS);
     for (int i = 0; i < config->LINHAS; i++) {
         printf(" ");
         for (int j = 0; j < config->COLUNAS; j++) {
@@ -64,27 +76,41 @@ void imprimir_labirinto(Configuracoes *config) {
         printf("\n");
     }
     printf("Inicio: (%d,%d)\n", inicio_x, inicio_y);
-    printf("Saida: (%d,%d)\n\n", saida_x, saida_y);
+    printf("Saida:  (%d,%d)\n\n", saida_x, saida_y);
 }
 
 void encontrar_posicoes(Configuracoes *config) {
-    for(int i = 0; i < config->LINHAS; i++) {
-        for(int j = 0; j < config->COLUNAS; j++) {
-            if(labirinto[i][j] == 'S') {
+    inicio_x = inicio_y = -1;
+    saida_x = saida_y = -1;
+
+    for (int i = 0; i < config->LINHAS; i++) {
+        for (int j = 0; j < config->COLUNAS; j++) {
+            if (labirinto[i][j] == 'S') {
                 inicio_x = i;
                 inicio_y = j;
-            }
-            if(labirinto[i][j] == 'E') {
+            } else if (labirinto[i][j] == 'E') {
                 saida_x = i;
                 saida_y = j;
             }
         }
     }
+
+    if (inicio_x == -1 || inicio_y == -1) {
+        printf("Erro: Posicao inicial 'S' nao encontrada\n");
+        exit(1);
+    }
+    if (saida_x == -1 || saida_y == -1) {
+        printf("Erro: Posicao final 'E' nao encontrada\n");
+        exit(1);
+    }
 }
 
 void liberar_labirinto(Configuracoes *config) {
-    for(int i = 0; i < config->LINHAS; i++) {
-        free(labirinto[i]);
+    if (labirinto) {
+        for (int i = 0; i < config->LINHAS; i++) {
+            free(labirinto[i]);
+        }
+        free(labirinto);
+        labirinto = NULL;
     }
-    free(labirinto);
 }

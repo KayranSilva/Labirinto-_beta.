@@ -1,49 +1,62 @@
+// main.c
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <string.h>
+#include <time.h>
+
 #include "config.h"
 #include "maze.h"
 #include "individual.h"
 #include "genetic.h"
 
 int main(int argc, char *argv[]) {
-    srand(time(NULL));
+    // Semente para o gerador de números aleatórios
+    srand((unsigned) time(NULL));
 
-   
+    // Arquivo de configuração padrão
     char arquivo_config[256] = "config.ini";
-
     if (argc >= 2) {
         strncpy(arquivo_config, argv[1], sizeof(arquivo_config) - 1);
         arquivo_config[sizeof(arquivo_config) - 1] = '\0';
     }
 
+    // Carrega as configurações do arquivo .ini
     Configuracoes config;
     if (!carregar_configuracao(arquivo_config, &config)) {
         printf("Erro ao carregar configuracoes!\n");
         return 1;
     }
 
+    // Se for passado um segundo argumento, usa-o como arquivo do labirinto
     if (argc >= 3) {
         strncpy(config.ARQUIVO_LABIRINTO, argv[2], sizeof(config.ARQUIVO_LABIRINTO) - 1);
         config.ARQUIVO_LABIRINTO[sizeof(config.ARQUIVO_LABIRINTO) - 1] = '\0';
     }
 
     printf("Arquivo de configuracao: %s\n", arquivo_config);
-    printf("Arquivo do labirinto: %s\n", config.ARQUIVO_LABIRINTO);
+    printf("Arquivo do labirinto : %s\n", config.ARQUIVO_LABIRINTO);
 
-  
-
+    // Carrega o labirinto, encontra as posições de início e saída, e exibe o labirinto
     carregar_labirinto(&config);
     encontrar_posicoes(&config);
     imprimir_labirinto(&config);
 
-    
+    // Abre (ou recria) o arquivo CSV de log, sobrescrevendo o conteúdo anterior
+    FILE *logFile = fopen("log.csv", "w");
+    if (!logFile) {
+        printf("Erro ao abrir arquivo de log.\n");
+        liberar_labirinto(&config);
+        return 1;
+    }
+    // Opcional: escreva um cabeçalho no CSV (caso deseje)
+    // fprintf(logFile, "Geracao;Fitness;Movimentos\n");
+
+    // Inicializa a população
     NoPopulacao *populacao = NULL;
     inicializar_populacao(&populacao, &config);
-
-    if(populacao == NULL) {
+    if (!populacao) {
         printf("Falha ao inicializar a populacao!\n");
+        fclose(logFile);
         liberar_labirinto(&config);
         return 1;
     }
@@ -51,29 +64,33 @@ int main(int argc, char *argv[]) {
     int geracao = 0;
     int solucao_encontrada = 0;
 
-    printf("\nPopulacao inicial:\n");
-    NoPopulacao *atual = populacao;
-    while(geracao < config.MAX_GERACOES && !solucao_encontrada) {
-    
+    // Loop principal das gerações do algoritmo genético
+    while (geracao < config.MAX_GERACOES && !solucao_encontrada) {
+        // Encontra o melhor indivíduo na população
         NoPopulacao *atual = populacao;
         NoPopulacao *melhor = atual;
-
-        while(atual != NULL) {
-            if(atual->individuo.aptidao > melhor->individuo.aptidao) {
+        while (atual) {
+            if (atual->individuo.aptidao > melhor->individuo.aptidao)
                 melhor = atual;
-            }
             atual = atual->proximo;
         }
 
-        printf("Geracao %4d - ", geracao);
-        printf("Melhor: %6d | ", melhor->individuo.aptidao);
-        printf("Dist: %2d | ", melhor->individuo.distancia);
-        printf("Col: %3d | ", melhor->individuo.colisoes);
-        printf("Passos: %2d | ", melhor->individuo.passos_validos);
-        printf("Desvio: %.2f\n", melhor->individuo.desvio_padrao);
+        // Exibe estatísticas da geração atual
+        printf("Geracao %4d - Melhor Aptidao: %6d | Dist: %2d | Colisoes: %3d | Passos: %2d | Desvio: %.2f\n",
+               geracao,
+               melhor->individuo.aptidao,
+               melhor->individuo.distancia,
+               melhor->individuo.colisoes,
+               melhor->individuo.passos_validos,
+               melhor->individuo.desvio_padrao);
 
+        // Registra no CSV: ID da geração (geracao+1), fitness (com uma casa decimal) e a representação textual dos movimentos
+        // Utilizamos ponto e vírgula (";") como delimitador para maior compatibilidade com configurações regionais.
+        fprintf(logFile, "%d;%.1f;%s\n", geracao + 1, (float)melhor->individuo.aptidao, melhor->individuo.movimentos);
+        fflush(logFile);
 
-        if(melhor->individuo.distancia == 0) {
+        // Se a solução foi encontrada (distância = 0), exibe o caminho e encerra o loop
+        if (melhor->individuo.distancia == 0) {
             printf("\nSOLUCAO ENCONTRADA na geracao %d!\n", geracao);
             printf("Caminho para a saida:\n");
             mostrar_caminho_individuo(&melhor->individuo, &config);
@@ -81,15 +98,15 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        if(geracao % 50 == 0) {
+        // Exibe periodicamente o caminho parcial do melhor indivíduo (a cada 50 gerações)
+        if (geracao % 50 == 0) {
             printf("\nVisualizacao do melhor caminho parcial:\n");
             mostrar_caminho_individuo(&melhor->individuo, &config);
         }
 
-
+        // Gera a nova geração (aplicando elitismo, seleção, cruzamento e mutação)
         nova_geracao(&populacao, &config);
-
-        if(populacao == NULL) {
+        if (!populacao) {
             printf("\nA populacao foi extinta!\n");
             break;
         }
@@ -97,36 +114,24 @@ int main(int argc, char *argv[]) {
         geracao++;
     }
 
-   if(!solucao_encontrada) {
+    // Se nenhuma solução foi encontrada após o número máximo de gerações,
+    // exibe o melhor indivíduo obtido.
+    if (!solucao_encontrada) {
         printf("\nNenhuma solucao encontrada apos %d geracoes\n", config.MAX_GERACOES);
-        printf("Mostrando a melhor solucao encontrada:\n");
-        NoPopulacao *atual = populacao;
-        NoPopulacao *melhor = atual;
-        while(atual != NULL) {
-            if(atual->individuo.aptidao > melhor->individuo.aptidao) {
+        NoPopulacao *atual = populacao, *melhor = atual;
+        while (atual) {
+            if (atual->individuo.aptidao > melhor->individuo.aptidao)
                 melhor = atual;
-            }
             atual = atual->proximo;
         }
-        #ifdef _WIN32
-            system("pause");
-        #endif
-
-        printf("\nMelhor solucao encontrada:\n");
         imprimir_individuo(&melhor->individuo, &config);
         mostrar_caminho_individuo(&melhor->individuo, &config);
-        #ifdef _WIN32
-            system("pause");
-        #endif
     }
 
-
+    // Libera os recursos e fecha o arquivo de log
     liberar_populacao(populacao);
     liberar_labirinto(&config);
-
-    #ifdef _WIN32
-        system("pause");
-    #endif
+    fclose(logFile);
 
     return 0;
 }

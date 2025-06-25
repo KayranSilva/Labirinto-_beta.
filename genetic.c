@@ -1,13 +1,12 @@
 #include "genetic.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <stdio.h>
-#include "individual.h"
-#include "config.h"
+
 int tamanho_populacao(NoPopulacao *cabeca) {
     int tamanho = 0;
-    while(cabeca != NULL) {
+    while (cabeca) {
         tamanho++;
         cabeca = cabeca->proximo;
     }
@@ -17,48 +16,43 @@ int tamanho_populacao(NoPopulacao *cabeca) {
 void inicializar_populacao(NoPopulacao **cabeca, Configuracoes *config) {
     *cabeca = NULL;
     NoPopulacao *cauda = NULL;
-    
-    for(int i = 0; i < config->TAM_POPULACAO; i++) {
-        NoPopulacao *novo_no = (NoPopulacao*)malloc(sizeof(NoPopulacao));
-        if(novo_no == NULL) {
-            printf("Erro ao alocar memoria para novo individuo\n");
+    srand((unsigned)time(NULL));
+
+    for (int i = 0; i < config->TAM_POPULACAO; i++) {
+        NoPopulacao *novo_no = malloc(sizeof(NoPopulacao));
+        if (!novo_no) {
+            printf("Erro: Falha ao alocar novo individuo\n");
             liberar_populacao(*cabeca);
             exit(1);
         }
-
-        // Aloca movimentos dinamicamente
-        
-        if(novo_no->individuo.movimentos == NULL) {
-            printf("Erro ao alocar memoria para movimentos\n");
+        novo_no->individuo.movimentos = malloc(config->MAX_MOVIMENTOS * sizeof(char));
+        if (!novo_no->individuo.movimentos) {
+            printf("Erro: Falha ao alocar movimentos\n");
             free(novo_no);
             liberar_populacao(*cabeca);
             exit(1);
         }
-        
-        char ultimo_movimento = '\0';
-        for(int j = 0; j < config->MAX_MOVIMENTOS; j++) {
-            char movimento;
-            int tentativas = 0;
-            
+
+        char ultimo_mov = '\0';
+        for (int j = 0; j < config->MAX_MOVIMENTOS; j++) {
+            char mov;
+            int tent = 0;
             do {
                 int r = rand() % 4;
-                char movimentos[] = {'C', 'B', 'E', 'D'};
-                movimento = movimentos[r];
-                tentativas++;
-                
-                if(!movimento_redundante(ultimo_movimento, movimento) || tentativas > 2) {
+                char ops[4] = { 'C', 'B', 'E', 'D' };
+                mov = ops[r];
+                tent++;
+                if (!movimento_redundante(ultimo_mov, mov) || tent > 2)
                     break;
-                }
-            } while(1);
-            
-            novo_no->individuo.movimentos[j] = movimento;
-            ultimo_movimento = movimento;
+            } while (1);
+            novo_no->individuo.movimentos[j] = mov;
+            ultimo_mov = mov;
         }
-        
+
         calcular_aptidao(&novo_no->individuo, config);
         novo_no->proximo = NULL;
-        
-        if(*cabeca == NULL) {
+
+        if (!*cabeca) {
             *cabeca = novo_no;
             cauda = novo_no;
         } else {
@@ -69,222 +63,215 @@ void inicializar_populacao(NoPopulacao **cabeca, Configuracoes *config) {
 }
 
 NoPopulacao* selecao_por_torneio(NoPopulacao *cabeca, Configuracoes *config) {
-    if(cabeca == NULL) return NULL;
-    
+    if (!cabeca) return NULL;
+
+    int tam = tamanho_populacao(cabeca);
     NoPopulacao *melhor = NULL;
-    float melhor_aptidao = -1000;
-    int tam_pop = tamanho_populacao(cabeca);
-    
-    for(int i = 0; i < config->TAM_TORNEIO; i++) {
-        int indice = rand() % tam_pop;
+    float best_fit = -1e9f;
+
+    for (int i = 0; i < config->TAM_TORNEIO; i++) {
+        int idx = rand() % tam;
         NoPopulacao *atual = cabeca;
-        
-        for(int j = 0; j < indice && atual != NULL; j++) {
+        for (int j = 0; j < idx && atual; j++) {
             atual = atual->proximo;
         }
-        
-        if(atual != NULL) {
-            if(melhor == NULL || atual->individuo.aptidao > melhor_aptidao) {
-                melhor = atual;
-                melhor_aptidao = atual->individuo.aptidao;
-            }
+        if (atual && (!melhor || atual->individuo.aptidao > best_fit)) {
+            melhor = atual;
+            best_fit = atual->individuo.aptidao;
         }
     }
     return melhor;
 }
 
-void cruzamento(Individuo *pai1, Individuo *pai2, Individuo *filho1, Individuo *filho2, Configuracoes *config) {
-    if((double)rand()/RAND_MAX > config->TAXA_CRUZAMENTO) {
-        memcpy(filho1, pai1, sizeof(Individuo));
-        memcpy(filho2, pai2, sizeof(Individuo));
+void cruzamento(Individuo *p1, Individuo *p2,
+                Individuo *f1, Individuo *f2,
+                Configuracoes *config) {
+    if (!f1 || !f2) {
+        printf("Erro: Ponteiro de filho nulo em cruzamento\n");
+        exit(1);
+    }
+    f1->movimentos = (char*)malloc(config->MAX_MOVIMENTOS * sizeof(char));
+    f2->movimentos = (char*)malloc(config->MAX_MOVIMENTOS * sizeof(char));
+    if (!f1->movimentos || !f2->movimentos) {
+        printf("Erro: Falha ao alocar movimentos para filhos\n");
+        exit(1);
+    }
+
+    if ((double)rand() / RAND_MAX > config->TAXA_CRUZAMENTO) {
+        memcpy(f1->movimentos, p1->movimentos, config->MAX_MOVIMENTOS);
+        memcpy(f2->movimentos, p2->movimentos, config->MAX_MOVIMENTOS);
         return;
     }
 
-    int ponto1 = rand() % config->MAX_MOVIMENTOS;
-    int ponto2 = rand() % config->MAX_MOVIMENTOS;
-    if(ponto1 > ponto2) {
-        int temp = ponto1;
-        ponto1 = ponto2;
-        ponto2 = temp;
+    int m = config->MAX_MOVIMENTOS;
+    int pt1 = rand() % m;
+    int pt2 = rand() % m;
+    if (pt1 > pt2) {
+        int t = pt1; pt1 = pt2; pt2 = t;
     }
-    
-    for(int i = 0; i < ponto1; i++) {
-        filho1->movimentos[i] = pai1->movimentos[i];
-        filho2->movimentos[i] = pai2->movimentos[i];
+
+    for (int i = 0; i < pt1; i++) {
+        f1->movimentos[i] = p1->movimentos[i];
+        f2->movimentos[i] = p2->movimentos[i];
     }
-    
-    for(int i = ponto1; i < ponto2; i++) {
-        filho1->movimentos[i] = pai2->movimentos[i];
-        filho2->movimentos[i] = pai1->movimentos[i];
+    for (int i = pt1; i < pt2; i++) {
+        f1->movimentos[i] = p2->movimentos[i];
+        f2->movimentos[i] = p1->movimentos[i];
     }
-    
-    for(int i = ponto2; i < config->MAX_MOVIMENTOS; i++) {
-        filho1->movimentos[i] = pai1->movimentos[i];
-        filho2->movimentos[i] = pai2->movimentos[i];
+    for (int i = pt2; i < m; i++) {
+        f1->movimentos[i] = p1->movimentos[i];
+        f2->movimentos[i] = p2->movimentos[i];
     }
 }
 
 void mutar(Individuo *ind, Configuracoes *config) {
-    char ultimo_movimento = '\0';
-    
-    for(int i = 0; i < config->MAX_MOVIMENTOS; i++) {
-        if((double)rand()/RAND_MAX < config->TAXA_MUTACAO) {
+    char ultimo_mov = '\0';
+    int m = config->MAX_MOVIMENTOS;
 
-            if(ind->distancia < 3 && i < 16) {
-                char movimentos_para_saida[4];
-                int contador = 0;
-                if(saida_x > inicio_x) movimentos_para_saida[contador++] = 'B';
-                if(saida_x < inicio_x) movimentos_para_saida[contador++] = 'C';
-                if(saida_y > inicio_y) movimentos_para_saida[contador++] = 'D';
-                if(saida_y < inicio_y) movimentos_para_saida[contador++] = 'E';
-                
-                if(contador > 0) {
-                    ind->movimentos[i] = movimentos_para_saida[rand() % contador];
-                    ultimo_movimento = ind->movimentos[i];
-                    continue;
-                }
-            }
-            
-     
-            char novo_movimento;
-            int tentativas = 0;
-            
+    for (int i = 0; i < m; i++) {
+        if ((double)rand() / RAND_MAX < config->TAXA_MUTACAO) {
+            char novo;
+            int tent = 0;
             do {
                 int r = rand() % 4;
-                char movimentos[] = {'C', 'B', 'E', 'D'};
-                novo_movimento = movimentos[r];
-                tentativas++;
-                
-                if(!movimento_redundante(ultimo_movimento, novo_movimento) || tentativas > 2) {
+                char ops[4] = { 'C', 'B', 'E', 'D' };
+                novo = ops[r];
+                tent++;
+                if (!movimento_redundante(ultimo_mov, novo) || tent > 2)
                     break;
-                }
-            } while(1);
-            
-            ind->movimentos[i] = novo_movimento;
+            } while (1);
+            ind->movimentos[i] = novo;
         }
-        
-        ultimo_movimento = ind->movimentos[i];
+        ultimo_mov = ind->movimentos[i];
     }
 }
 
 void ordenar_populacao(NoPopulacao **cabeca) {
-    if(*cabeca == NULL || (*cabeca)->proximo == NULL) return;
-    
-    NoPopulacao *ordenada = NULL;
+    if (!cabeca || !*cabeca || !(*cabeca)->proximo) return;
+
+    NoPopulacao *ord = NULL;
     NoPopulacao *atual = *cabeca;
-    
-    while(atual != NULL) {
-        NoPopulacao *proximo = atual->proximo;
-        
-        if(ordenada == NULL || atual->individuo.aptidao > ordenada->individuo.aptidao) {
-            atual->proximo = ordenada;
-            ordenada = atual;
+    while (atual) {
+        NoPopulacao *prox = atual->proximo;
+        if (!ord || atual->individuo.aptidao > ord->individuo.aptidao) {
+            atual->proximo = ord;
+            ord = atual;
         } else {
-            NoPopulacao *temp = ordenada;
-            while(temp->proximo != NULL && 
-                  atual->individuo.aptidao <= temp->proximo->individuo.aptidao) {
-                temp = temp->proximo;
+            NoPopulacao *tmp = ord;
+            while (tmp->proximo &&
+                   atual->individuo.aptidao <= tmp->proximo->individuo.aptidao) {
+                tmp = tmp->proximo;
             }
-            atual->proximo = temp->proximo;
-            temp->proximo = atual;
+            atual->proximo = tmp->proximo;
+            tmp->proximo = atual;
         }
-        atual = proximo;
+        atual = prox;
     }
-    
-    *cabeca = ordenada;
+    *cabeca = ord;
 }
 
 void nova_geracao(NoPopulacao **cabeca, Configuracoes *config) {
-    if(*cabeca == NULL) return;
+    if (!cabeca || !*cabeca) return;
 
     ordenar_populacao(cabeca);
-    
-    NoPopulacao *nova_cabeca = NULL;
-    NoPopulacao *nova_cauda = NULL;
-    int elite = config->TAM_POPULACAO * config->TAXA_ELITISMO;
-    int tamanho_atual = 0;
-    
 
-    NoPopulacao *atual = *cabeca;
-    for(int i = 0; i < elite && atual != NULL; i++) {
-        NoPopulacao *novo_no = (NoPopulacao*)malloc(sizeof(NoPopulacao));
-        if(novo_no == NULL) {
-            printf("Erro ao alocar memoria para elite\n");
-            liberar_populacao(nova_cabeca);
+    int pop_size = config->TAM_POPULACAO;
+    int elite_cnt = (int)(pop_size * config->TAXA_ELITISMO);
+    if (elite_cnt < 1) elite_cnt = 1;
+
+    NoPopulacao *old = *cabeca;
+    NoPopulacao *nova = NULL;
+    NoPopulacao *cauda = NULL;
+
+    // Copia elite
+    for (int i = 0; i < elite_cnt && old; i++) {
+        NoPopulacao *n = malloc(sizeof(NoPopulacao));
+        if (!n) {
+            printf("Erro: Falha ao alocar elite\n");
+            liberar_populacao(nova);
             exit(1);
         }
-        
-        memcpy(&novo_no->individuo, &atual->individuo, sizeof(Individuo));
-        novo_no->proximo = NULL;
-        
-        if(nova_cabeca == NULL) {
-            nova_cabeca = novo_no;
-            nova_cauda = novo_no;
-        } else {
-            nova_cauda->proximo = novo_no;
-            nova_cauda = novo_no;
+        n->individuo.movimentos = malloc(config->MAX_MOVIMENTOS * sizeof(char));
+        if (!n->individuo.movimentos) {
+            printf("Erro: Falha ao alocar movimentos para elite\n");
+            free(n);
+            liberar_populacao(nova);
+            exit(1);
         }
-        atual = atual->proximo;
-        tamanho_atual++;
+        // Copia todos os campos exceto ponteiro movimentos
+        memcpy(n->individuo.movimentos, old->individuo.movimentos, config->MAX_MOVIMENTOS);
+        n->individuo.aptidao = old->individuo.aptidao;
+        n->individuo.pontuacao_movimentos = old->individuo.pontuacao_movimentos;
+        n->individuo.desvio_padrao = old->individuo.desvio_padrao;
+        n->individuo.distancia = old->individuo.distancia;
+        n->individuo.colisoes = old->individuo.colisoes;
+        n->individuo.passos_validos = old->individuo.passos_validos;
+        n->proximo = NULL;
+        if (!nova) nova = cauda = n;
+        else {
+            cauda->proximo = n;
+            cauda = n;
+        }
+        old = old->proximo;
     }
-    
 
-    while(tamanho_atual < config->TAM_POPULACAO) {
-        NoPopulacao *pai1 = selecao_por_torneio(*cabeca, config);
-        NoPopulacao *pai2 = selecao_por_torneio(*cabeca, config);
-        
-        if(pai1 == NULL || pai2 == NULL) {
-            printf("Erro na selecao de pais\n");
+    // Gera novos individuos
+    int cnt = elite_cnt;
+    while (cnt < pop_size) {
+        NoPopulacao *p1 = selecao_por_torneio(*cabeca, config);
+        NoPopulacao *p2 = selecao_por_torneio(*cabeca, config);
+        if (!p1 || !p2) {
+            printf("Erro: Selecao de pais falhou\n");
             break;
         }
-        
-        NoPopulacao *filho1 = (NoPopulacao*)malloc(sizeof(NoPopulacao));
-        NoPopulacao *filho2 = (NoPopulacao*)malloc(sizeof(NoPopulacao));
-        if(filho1 == NULL || filho2 == NULL) {
-            printf("Erro ao alocar memoria para filhos\n");
-            free(filho1);
-            free(filho2);
+
+        NoPopulacao *filho1 = malloc(sizeof(NoPopulacao));
+        NoPopulacao *filho2 = malloc(sizeof(NoPopulacao));
+        if (!filho1 || !filho2) {
+            printf("Erro: Falha ao alocar filhos\n");
+            if (filho1) free(filho1);
+            if (filho2) free(filho2);
             break;
         }
-        
-        cruzamento(&pai1->individuo, &pai2->individuo, 
-                 &filho1->individuo, &filho2->individuo, config);
-        
+
+        cruzamento(&p1->individuo, &p2->individuo,
+                  &filho1->individuo, &filho2->individuo, config);
         mutar(&filho1->individuo, config);
         mutar(&filho2->individuo, config);
-        
         calcular_aptidao(&filho1->individuo, config);
         calcular_aptidao(&filho2->individuo, config);
-        
+
         filho1->proximo = NULL;
         filho2->proximo = NULL;
-        
-        if(nova_cabeca == NULL) {
-            nova_cabeca = filho1;
-            nova_cauda = filho1;
-        } else {
-            nova_cauda->proximo = filho1;
-            nova_cauda = filho1;
+
+        if (!nova) nova = cauda = filho1;
+        else {
+            cauda->proximo = filho1;
+            cauda = filho1;
         }
-        tamanho_atual++;
-        
-        if(tamanho_atual < config->TAM_POPULACAO) {
-            nova_cauda->proximo = filho2;
-            nova_cauda = filho2;
-            tamanho_atual++;
+        cnt++;
+
+        if (cnt < pop_size) {
+            cauda->proximo = filho2;
+            cauda = filho2;
+            cnt++;
         } else {
+            if (filho2->individuo.movimentos)
+                free(filho2->individuo.movimentos);
             free(filho2);
         }
     }
-    
+
     liberar_populacao(*cabeca);
-    *cabeca = nova_cabeca;
+    *cabeca = nova;
 }
 
 void liberar_populacao(NoPopulacao *cabeca) {
-    while(cabeca != NULL) {
-        NoPopulacao *temp = cabeca;
+    while (cabeca) {
+        NoPopulacao *t = cabeca;
         cabeca = cabeca->proximo;
-        free(temp);
+        if (t->individuo.movimentos)
+            free(t->individuo.movimentos);
+        free(t);
     }
 }
