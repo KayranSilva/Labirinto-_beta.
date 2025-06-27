@@ -1,17 +1,32 @@
-
 # Genetic Labirinto Solver
 
-[![Logo do Projeto](assets/logo.png)](https://github.com/seuusuario/genetic-labirinto-solver)
+![Evolução do Fitness](assets/evolucao_fitness.png)
 
-## Sobre
-O **Genetic Labirinto Solver** é um projeto em C que utiliza algoritmos genéticos para encontrar soluções em labirintos, evoluindo sequências de movimentos (C, B, E, D) para sair do labirinto.
+## 📌 Visão Geral
 
-## Funcionalidades
-- **Carregamento Dinâmico:** O labirinto é lido de um arquivo (definido em `config.ini`).
-- **Algoritmo Genético:** Seleção por torneio, cruzamento e mutação com elitismo.
-- **Registro de Progresso:** Geração de log em CSV (`log.csv`) com ID da geração, Fitness e Movimentos.
-- **Visualização:** Exibe passo a passo o caminho do melhor indivíduo.
+Este projeto implementa um algoritmo genético em C para resolver labirintos. Cada indivíduo representa uma sequência de movimentos:
+- **C**: cima
+- **B**: baixo
+- **E**: esquerda
+- **D**: direita
 
-## Estrutura do Projeto
+O objetivo é encontrar o caminho do ponto de partida (S) até a saída (E) utilizando heurísticas genéticas.
 
-/GeneticLabirintoSolver ├── config.ini         # Parâmetros do algoritmo e do labirinto ├── maze.txt           # Arquivo do labirinto ├── log.csv            # Log gerado em cada execução ├── src │   ├── config.h / config.c │   ├── maze.h / maze.c │   ├── individual.h / individual.c │   ├── genetic.h / genetic.c │   └── main.c └── assets ├── logo.png ├── evolucao_fitness.png   # Exemplo de gráfico de evolução └── sample_maze.png        # Exemplo do labirinto
+---
+
+## 🚀 Funcionalidades
+
+- Leitura dinâmica de labirintos (`maze.txt`)
+- Configuração por arquivo `.ini`
+- Algoritmo genético com:
+  - Seleção por torneio
+  - Cruzamento
+  - Mutação
+  - Elitismo
+- Log automático em `log.csv`
+- Suporte a análise gráfica dos dados
+- Visualização animada do melhor caminho no terminal
+
+---
+
+Autores: Kayran Silva e Thales Rafael 👍

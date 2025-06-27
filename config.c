@@ -23,25 +23,7 @@ static char* trim(char *s) {
     return start;
 }
 
-static void default_config(Configuracoes *cfg) {
-    cfg->TAM_POPULACAO   = 300;
-    cfg->MAX_MOVIMENTOS  = 200;
-    cfg->TAXA_MUTACAO    = 0.20f;
-    cfg->TAXA_CRUZAMENTO = 0.95f;
-    cfg->TAXA_ELITISMO   = 0.50f;
-    cfg->MAX_GERACOES    = 500;
-    strcpy(cfg->ARQUIVO_LABIRINTO, "maze2.txt");
-    cfg->LINHAS          = 0;
-    cfg->COLUNAS         = 0;
-    cfg->PESO_DISTANCIA  = 100;
-    cfg->PESO_OBSTACULO  = 100;
-    cfg->PESO_DESVIO     = 1;
-    cfg->TAM_TORNEIO     = 5;
-    cfg->PESO_CIMA       = 1;
-    cfg->PESO_BAIXO      = 2;
-    cfg->PESO_ESQUERDA   = 3;
-    cfg->PESO_DIREITA    = 4;
-}
+
 
 int carregar_configuracao(const char *arquivo, Configuracoes *cfg) {
     FILE *f = fopen(arquivo, "r");
@@ -50,7 +32,7 @@ int carregar_configuracao(const char *arquivo, Configuracoes *cfg) {
         return 0;
     }
 
-    default_config(cfg);
+    
 
     char linha[512];
     while (fgets(linha, sizeof linha, f)) {
@@ -89,6 +71,6 @@ int carregar_configuracao(const char *arquivo, Configuracoes *cfg) {
     }
 
     fclose(f);
-    
+
     return 1;
 }
